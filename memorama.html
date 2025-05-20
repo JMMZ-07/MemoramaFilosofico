@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Memorama Filosófico</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Georgia', serif;
+      background: linear-gradient(to right, #f5f0e1, #e9e4d4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .timer-container {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 15px;
+      border-radius: 10px;
+      font-size: 18px;
+      color: #3e2723;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      text-align: center;
+      width: 150px;
+    }
+
+    .timer-container h3 {
+      margin: 0;
+      font-size: 24px;
+      color: #a89e91;
+      font-family: 'Times New Roman', serif;
+    }
+
+    .timer-container p {
+      margin: 5px 0;
+      font-size: 16px;
+      color: #4e342e;
+    }
+
+    h1 {
+      margin-top: 2rem;
+      font-size: 2.5rem;
+      color: #4e342e;
+    }
+
+    #game {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr); /* Fijo 4 columnas */
+      gap: 1rem;
+      max-width: 700px;
+      margin: 2rem auto;
+      width: 90%;
+      transition: all 0.3s ease-in-out;
+    }
+
+    .card {
+      perspective: 1000px;
+      position: relative;
+      opacity: 1;
+      transform: scale(1);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .card.removed {
+      opacity: 0;
+      transform: scale(0.5);
+      pointer-events: none;
+    }
+
+    .inner-card {
+      width: 100%;
+      height: 180px;
+      border-radius: 12px;
+      background: #5d4037;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: transform 0.6s;
+      transform-style: preserve-3d;
+      cursor: pointer;
+      position: relative;
+      box-shadow: 0 6px 12px rgba(0,0,0,0.2);
+    }
+
+    .flipped .inner-card {
+      transform: rotateY(180deg);
+    }
+
+    .front, .back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    .front {
+      background-color: #5d4037;
+      color: #c8e6c9;
+      font-size: 28px;
+    }
+
+    .back {
+      background: #fffde7;
+      color: #3e2723;
+      transform: rotateY(180deg);
+      border: 2px dashed #8d6e63;
+      font-style: italic;
+      flex-direction: column;
+    }
+
+    .back img {
+      max-height: 80px;
+      margin-bottom: 8px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+      filter: grayscale(100%);
+    }
+
+    @media (max-width: 600px) {
+      .inner-card {
+        height: 140px;
+        font-size: 14px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="timer-container">
+    <h3>⏰ Tiempo Restante</h3>
+    <p>Tiempo restante: <span id="time-left">2:00</span></p>
+    <h3>🔢 Intento</h3>
+    <p>Intento: <span id="attempt-count">1</span></p>
+  </div>
+
+  <h1>🧠 Memorama Filosófico</h1>
+  <div id="game"></div>
+
+  <script>
+    const pairs = [
+      ["Sócrates", "“Conócete a ti mismo”"],
+      ["Platón", "“El mundo de las Ideas”"],
+      ["Aristóteles", "“La virtud como hábito”"],
+      ["Descartes", "“Pienso, luego existo”"],
+      ["Nietzsche", "“El superhombre”"],
+      ["Kant", "Categoría moral"],
+      ["Heidegger", "“Ser-en-el-mundo”"],
+      ["Simone de Beauvoir", "“El segundo sexo”"]
+    ];
+    const philosopherImages = {
+      "Sócrates": "socrates.jpg",
+      "Platón": "platon.jpg",
+      "Aristóteles": "aristoteles.jpg",
+      "Descartes": "descartes.jpg",
+      "Nietzsche": "Nietzsche.jpg",
+      "Kant": "kant.jpg",
+      "Heidegger": "heidegger.jpg",
+      "Simone de Beauvoir": "Simone.jpg"
+    };
+
+    let attemptCount = 1; // Número de intentos totales
+    const maxAttempts = 4;
+
+    function startGame() {
+      let cards = [];
+      pairs.forEach(([concepto, definicion]) => {
+        cards.push({ text: concepto, pairId: concepto });
+        cards.push({ text: definicion, pairId: concepto });
+      });
+
+      cards = cards.sort(() => 0.5 - Math.random());
+
+      const game = document.getElementById("game");
+      game.innerHTML = ""; // Limpiar el tablero anterior
+
+      let flippedCards = [];
+      let matchedCount = 0;
+      let timeLeft = 120;
+      let attemptsThisRound = 0;
+      let timerInterval;
+
+      function updateTimer() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        document.getElementById("time-left").textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+      }
+
+      function startTimer() {
+        timerInterval = setInterval(() => {
+          if (timeLeft > 0) {
+            timeLeft--;
+            updateTimer();
+          } else {
+            clearInterval(timerInterval);
+            alert("⏰ ¡Se acabó el tiempo! Reiniciando intento...");
+            if (attemptCount < maxAttempts) {
+              attemptCount++;
+              document.getElementById("attempt-count").textContent = attemptCount;
+              startGame();
+            } else {
+              alert("❌ ¡Has alcanzado el límite de 4 intentos!");
+            }
+          }
+        }, 1000);
+      }
+
+      function createCard(cardData, index) {
+        const cardContainer = document.createElement("div");
+        cardContainer.className = "card";
+        cardContainer.dataset.pairId = cardData.pairId;
+
+        const innerCard = document.createElement("div");
+        innerCard.className = "inner-card";
+
+        const front = document.createElement("div");
+        front.className = "front";
+        front.textContent = "✦";
+
+        const back = document.createElement("div");
+        back.className = "back";
+
+        if (philosopherImages[cardData.text]) {
+          const img = document.createElement("img");
+          img.src = philosopherImages[cardData.text];
+          img.alt = cardData.text;
+          const name = document.createElement("div");
+          name.textContent = cardData.text;
+          back.appendChild(img);
+          back.appendChild(name);
+        } else {
+          back.textContent = cardData.text;
+        }
+
+        innerCard.appendChild(front);
+        innerCard.appendChild(back);
+        cardContainer.appendChild(innerCard);
+
+        cardContainer.addEventListener("click", () => flipCard(cardContainer));
+        return cardContainer;
+      }
+
+      function flipCard(card) {
+        if (
+          card.classList.contains("matched") ||
+          flippedCards.includes(card) ||
+          flippedCards.length === 2 ||
+          timeLeft <= 0
+        ) {
+          return;
+        }
+
+        card.classList.add("flipped");
+        flippedCards.push(card);
+
+        if (flippedCards.length === 2) {
+          const [first, second] = flippedCards;
+          if (first.dataset.pairId === second.dataset.pairId) {
+            setTimeout(() => {
+              first.classList.add("removed");
+              second.classList.add("removed");
+
+              setTimeout(() => {
+                first.remove();
+                second.remove();
+              }, 300);
+
+              matchedCount++;
+
+              if (matchedCount === pairs.length) {
+                clearInterval(timerInterval);
+                setTimeout(() => alert("🎉 ¡Felicidades! Has completado el memorama filosófico."), 300);
+              }
+            }, 500);
+          } else {
+            attemptsThisRound++;
+            if (attemptsThisRound >= 10) { // Puedes ajustar este valor si lo deseas
+              clearInterval(timerInterval);
+              alert("❌ ¡Demasiados fallos! Reiniciando intento...");
+              if (attemptCount < maxAttempts) {
+                attemptCount++;
+                document.getElementById("attempt-count").textContent = attemptCount;
+                startGame();
+              } else {
+                alert("❌ ¡Has alcanzado el límite de 4 intentos!");
+              }
+            }
+          }
+
+          setTimeout(() => {
+            first.classList.remove("flipped");
+            second.classList.remove("flipped");
+            flippedCards = [];
+          }, 1000);
+        }
+      }
+
+      cards.forEach((data, index) => {
+        game.appendChild(createCard(data, index));
+      });
+
+      startTimer();
+    }
+
+    // Iniciar el primer intento
+    document.getElementById("attempt-count").textContent = attemptCount;
+    startGame();
+  </script>
+
+</body>
+</html>
